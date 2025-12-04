@@ -1,2 +1,1 @@
-# Todo-Dia
-## 24hr Clock Planner
+# 24hr Clock Planner
