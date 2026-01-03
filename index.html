@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>24-Hour Life Clock</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+        }
+        #clockCanvas {
+            background: lightslategrey;
+            border-radius: 50%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        /* Settings Panel */
+        #settingsPanel {
+            position: fixed;
+            right: -400px;
+            top: 0;
+            width: 400px;
+            height: 100vh;
+            background: lightgoldenrodyellow;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.3);
+            transition: right 0.3s ease;
+            padding: 30px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        #settingsPanel.open {
+            right: 0;
+        }
+        #settingsPanel h2 {
+            margin-top: 0;
+            color: #2C3E50;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #34495E;
+            font-weight: bold;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ECF0F1;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3498DB;
+        }
+        .time-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .color-picker-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .color-picker-container input[type="color"] {
+            width: 60px;
+            height: 40px;
+            border: none;
+            cursor: pointer;
+        }
+        .icon-selector {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+        }
+        .icon-option {
+            font-size: 24px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px solid #ECF0F1;
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+        .icon-option:hover {
+            background: #ECF0F1;
+        }
+        .icon-option.selected {
+            border-color: #3498DB;
+            background: #EBF5FB;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-save {
+            background: #2ECC71;
+            color: white;
+        }
+        .btn-save:hover {
+            background: #27AE60;
+        }
+        .btn-delete {
+            background: #E74C3C;
+            color: white;
+        }
+        .btn-delete:hover {
+            background: #C0392B;
+        }
+        .btn-cancel {
+            background: #95A5A6;
+            color: white;
+        }
+        .btn-cancel:hover {
+            background: #7F8C8D;
+        }
+        #closePanel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #95A5A6;
+            width: auto;
+            padding: 5px 10px;
+        }
+        #closePanel:hover {
+            color: #2C3E50;
+        }
+        /* Data management button */
+        #dataControls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        #dataControls button {
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #2C3E50;
+            border: 2px solid #34495E;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #dataControls button:hover {
+            background: white;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="clockCanvas" width="600" height="600"></canvas>
+
+    <div id="dataControls">
+        <button id="viewData">View Stored Data</button>
+        <button id="clearData">Clear All Data</button>
+    </div>
+
+    <div id="settingsPanel">
+        <button id="closePanel">×</button>
+        <h2>Edit Activity</h2>
+        <div class="form-group">
+            <label for="activityLabel">Activity Name</label>
+            <input type="text" id="activityLabel" placeholder="e.g., Deep Work">
+        </div>
+        <div class="form-group">
+            <label>Start Time</label>
+            <div class="time-inputs">
+                <input type="number" id="startHour" min="0" max="23" placeholder="Hour (0-23)">
+                <input type="number" id="startMin" min="0" max="59" placeholder="Min (0-59)">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Duration</label>
+            <div class="time-inputs">
+                <input type="number" id="durationHours" min="0" max="24" placeholder="Hours">
+                <input type="number" id="durationMin" min="0" max="59" placeholder="Minutes">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="activityColor">Color</label>
+            <div class="color-picker-container">
+                <input type="color" id="activityColor">
+                <span id="colorHex">#3498DB</span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Icon</label>
+            <div class="icon-selector" id="iconSelector">
+                <div class="icon-option" data-icon="🌙">🌙</div>
+                <div class="icon-option" data-icon="☕">☕</div>
+                <div class="icon-option" data-icon="💼">💼</div>
+                <div class="icon-option" data-icon="🍔">🍔</div>
+                <div class="icon-option" data-icon="⚡">⚡</div>
+                <div class="icon-option" data-icon="🏋️">🏋️</div>
+                <div class="icon-option" data-icon="🎮">🎮</div>
+                <div class="icon-option" data-icon="📚">📚</div>
+                <div class="icon-option" data-icon="🎨">🎨</div>
+                <div class="icon-option" data-icon="🚗">🚗</div>
+                <div class="icon-option" data-icon="✈️">✈️</div>
+                <div class="icon-option" data-icon="🎵">🎵</div>
+            </div>
+        </div>
+        <div class="button-group">
+            <button class="btn-save" id="saveActivity">Save</button>
+            <button class="btn-delete" id="deleteActivity">Delete</button>
+            <button class="btn-cancel" id="cancelEdit">Cancel</button>
+        </div>
+    </div>
+    <script>
+        // Activities array
+        let activities = [];
+        let currentEditingIndex = -1;
+        let selectedIcon = '';
+        let isAddingNew = false;
+
+        // Load/Save from localStorage
+        function loadFromStorage() {
+            const saved = localStorage.getItem('lifeClockActivities');
+            if (saved) {
+                try {
+                    activities = JSON.parse(saved);
+                } catch (e) {
+                    activities = [];
+                }
+            }
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('lifeClockActivities', JSON.stringify(activities));
+        }
+
+        // Convert hours + minutes to degrees (0° = midnight at bottom)
+        function timeToAngle(hours, minutes) {
+            return (hours * 15) + (minutes * 0.25);
+        }
+
+        // Draw a single activity wedge
+        function drawActivityWedge(ctx, centerX, centerY, radius, activity) {
+            const startAngle = timeToAngle(activity.startHour, activity.startMin);
+            const endAngle = timeToAngle(
+                activity.startHour + activity.durationHours,
+                activity.startMin + activity.durationMin
+            );
+
+            const startRad = ((startAngle + 90) % 360) * Math.PI / 180;
+            const endRad = ((endAngle + 90) % 360) * Math.PI / 180;
+
+            // Draw wedge
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, startRad, endRad);
+            ctx.closePath();
+            ctx.fillStyle = activity.color;
+            ctx.fill();
+
+            // Draw icon with white background
+            if (activity.icon) {
+                const midAngle = (startAngle + endAngle) / 2;
+                const midRad = ((midAngle + 90) % 360) * Math.PI / 180;
+                const iconDistance = radius * 0.6;
+                const iconX = centerX + iconDistance * Math.cos(midRad);
+                const iconY = centerY + iconDistance * Math.sin(midRad);
+
+                // White circle background
+                ctx.beginPath();
+                ctx.arc(iconX, iconY, 20, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Icon
+                ctx.font = '28px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#000000';
+                ctx.fillText(activity.icon, iconX, iconY);
+            }
+        }
+
+        // Draw hour markers
+        function drawHourMarkers(ctx, centerX, centerY, radius) {
+            ctx.fillStyle = '#2C3E50';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let hour = 0; hour < 24; hour++) {
+                const angle = ((timeToAngle(hour, 0) + 90) % 360) * Math.PI / 180;
+                const x = centerX + (radius + 25) * Math.cos(angle);
+                const y = centerY + (radius + 25) * Math.sin(angle);
+                ctx.fillText(hour.toString().padStart(2, '0'), x, y);
+            }
+
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = '#7F8C8D';
+            // ctx.fillText('Midnight', centerX, centerY + radius + 45);
+            // ctx.fillText('Noon', centerX, centerY - radius - 45);
+
+            ctx.save();
+            ctx.translate(centerX - radius - 50, centerY);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('☀️', 0, 0);
+            ctx.restore();
+
+            ctx.save();
+            ctx.translate(centerX + radius + 50, centerY);
+            ctx.rotate(Math.PI / 2);
+            ctx.fillText('🌙', 0, 0);
+            ctx.restore();
+        }
+
+        // Draw sun/moon indicator
+        function drawTimeIndicator(ctx, centerX, centerY, radius) {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+
+            const totalMinutes = (hours * 60) + minutes + (seconds / 60);
+            const angle = (totalMinutes / (24 * 60)) * 360;
+            const angleRad = ((angle + 90) % 360) * Math.PI / 180;
+
+            const indicatorRadius = radius + 10;
+            const x = centerX + indicatorRadius * Math.cos(angleRad);
+            const y = centerY + indicatorRadius * Math.sin(angleRad);
+
+            const isDay = hours >= 6 && hours < 18;
+
+            ctx.save();
+            ctx.translate(x, y);
+
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
+            if (isDay) {
+                gradient.addColorStop(0, 'rgba(255, 215, 0, 0.8)');
+                gradient.addColorStop(1, 'rgba(255, 215, 0, 0)');
+            } else {
+                gradient.addColorStop(0, 'rgba(200, 200, 255, 0.6)');
+                gradient.addColorStop(1, 'rgba(200, 200, 255, 0)');
+            }
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(0, 0, 20, 0, 2 * Math.PI);
+            ctx.fill();
+
+            ctx.font = '32px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(isDay ? '☀️' : '🌙', 0, 0);
+
+            ctx.restore();
+        }
+
+        // Main draw function
+        function drawClock(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 60;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Background circle
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ECF0F1';
+            ctx.fill();
+            ctx.strokeStyle = '#34495E';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw all activities
+            activities.forEach(activity => {
+                drawActivityWedge(ctx, centerX, centerY, radius, activity);
+            });
+
+            drawHourMarkers(ctx, centerX, centerY, radius);
+            drawTimeIndicator(ctx, centerX, centerY, radius);
+
+            // Center dot
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
+            ctx.fillStyle = '#2C3E50';
+            ctx.fill();
+        }
+
+        // Settings panel functions
+        function openSettingsPanel(activityIndex) {
+            isAddingNew = false;
+            currentEditingIndex = activityIndex;
+            const activity = activities[activityIndex];
+
+            document.getElementById('settingsPanel').querySelector('h2').textContent = 'Edit Activity';
+            document.getElementById('activityLabel').value = activity.label;
+            document.getElementById('startHour').value = activity.startHour;
+            document.getElementById('startMin').value = activity.startMin;
+            document.getElementById('durationHours').value = activity.durationHours;
+            document.getElementById('durationMin').value = activity.durationMin;
+            document.getElementById('activityColor').value = activity.color;
+            document.getElementById('colorHex').textContent = activity.color;
+
+            selectedIcon = activity.icon;
+            document.querySelectorAll('.icon-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.icon === selectedIcon);
+            });
+
+            document.getElementById('deleteActivity').style.display = '';
+            document.getElementById('settingsPanel').classList.add('open');
+        }
+
+        function openNewActivityPanel(clickAngle) {
+            isAddingNew = true;
+            currentEditingIndex = -1;
+            const startHour = Math.floor(clickAngle / 15);
+            document.getElementById('settingsPanel').querySelector('h2').textContent = 'Add New Activity';
+            document.getElementById('activityLabel').value = '';
+            document.getElementById('startHour').value = startHour;
+            document.getElementById('startMin').value = 0;
+            document.getElementById('durationHours').value = 1;
+            document.getElementById('durationMin').value = 0;
+            document.getElementById('activityColor').value = '#3498DB';
+            document.getElementById('colorHex').textContent = '#3498DB';
+            selectedIcon = '';
+            document.querySelectorAll('.icon-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.icon === selectedIcon);
+            });
+            document.getElementById('deleteActivity').style.display = 'none';
+            document.getElementById('settingsPanel').classList.add('open');
+        }
+
+        function closeSettingsPanel() {
+            document.getElementById('settingsPanel').classList.remove('open');
+        }
+
+        // Click detection
+        function getMousePos(canvas, evt) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
+            };
+        }
+
+        function mouseToAngle(mouseX, mouseY, centerX, centerY) {
+            const dx = mouseX - centerX;
+            const dy = mouseY - centerY;
+            let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            angle = angle - 90;
+            if (angle < 0) angle += 360;
+            return angle;
+        }
+
+        function isInsideCircle(mouseX, mouseY, centerX, centerY, radius) {
+            const dx = mouseX - centerX;
+            const dy = mouseY - centerY;
+            return Math.sqrt(dx * dx + dy * dy) <= radius;
+        }
+
+        function getClickedActivity(clickAngle) {
+            for (let i = 0; i < activities.length; i++) {
+                const activity = activities[i];
+                const startAngle = timeToAngle(activity.startHour, activity.startMin);
+                const endAngle = timeToAngle(
+                    activity.startHour + activity.durationHours,
+                    activity.startMin + activity.durationMin
+                );
+
+                if (endAngle < startAngle) {
+                    if (clickAngle >= startAngle || clickAngle <= endAngle) {
+                        return i;
+                    }
+                } else {
+                    if (clickAngle >= startAngle && clickAngle <= endAngle) {
+                        return i;
+                    }
+                }
+            }
+            return -1;
+        }
+
+        // Event listeners
+        document.getElementById('iconSelector').addEventListener('click', function(e) {
+            if (e.target.classList.contains('icon-option')) {
+                selectedIcon = e.target.dataset.icon;
+                document.querySelectorAll('.icon-option').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                e.target.classList.add('selected');
+            }
+        });
+
+        document.getElementById('activityColor').addEventListener('input', function(e) {
+            document.getElementById('colorHex').textContent = e.target.value;
+        });
+
+        document.getElementById('closePanel').addEventListener('click', closeSettingsPanel);
+        document.getElementById('cancelEdit').addEventListener('click', closeSettingsPanel);
+
+        document.getElementById('saveActivity').addEventListener('click', function() {
+            const newActivity = {
+                startHour: parseInt(document.getElementById('startHour').value) || 0,
+                startMin: parseInt(document.getElementById('startMin').value) || 0,
+                durationHours: parseInt(document.getElementById('durationHours').value) || 0,
+                durationMin: parseInt(document.getElementById('durationMin').value) || 0,
+                color: document.getElementById('activityColor').value,
+                icon: selectedIcon,
+                label: document.getElementById('activityLabel').value || 'New Activity'
+            };
+
+            if (isAddingNew) {
+                activities.push(newActivity);
+            } else if (currentEditingIndex !== -1) {
+                activities[currentEditingIndex] = newActivity;
+            }
+
+            saveToStorage();
+            drawClock('clockCanvas');
+            closeSettingsPanel();
+        });
+
+        document.getElementById('deleteActivity').onclick = function() {
+            if (isAddingNew || currentEditingIndex === -1) return;
+            activities.splice(currentEditingIndex, 1);
+            saveToStorage();
+            drawClock('clockCanvas');
+            closeSettingsPanel();
+        };
+
+        const canvas = document.getElementById('clockCanvas');
+        canvas.addEventListener('click', function(evt) {
+            const mousePos = getMousePos(canvas, evt);
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 60;
+
+            if (isInsideCircle(mousePos.x, mousePos.y, centerX, centerY, radius)) {
+                const clickAngle = mouseToAngle(mousePos.x, mousePos.y, centerX, centerY);
+                const activityIndex = getClickedActivity(clickAngle);
+
+                if (activityIndex !== -1) {
+                    openSettingsPanel(activityIndex);
+                } else {
+                    openNewActivityPanel(clickAngle);
+                }
+            }
+        });
+
+        document.getElementById('viewData').addEventListener('click', function() {
+            const saved = localStorage.getItem('lifeClockActivities');
+            if (saved) {
+                alert('Stored activities:\n\n' + JSON.stringify(JSON.parse(saved), null, 2));
+            } else {
+                alert('No stored data found!');
+            }
+        });
+
+        document.getElementById('clearData').addEventListener('click', function() {
+            localStorage.removeItem('lifeClockActivities');
+            activities = [];
+            drawClock('clockCanvas');
+            alert('All data cleared!');
+        });
+
+        // Initialize
+        loadFromStorage();
+        setInterval(() => drawClock('clockCanvas'), 1000);
+        drawClock('clockCanvas');
+    </script>
+</body>
+</html>
